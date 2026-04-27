@@ -41,7 +41,7 @@ export const AttendanceDaily = sequelize.define(
     },
 
     status: {
-      type: DataTypes.ENUM("PRESENT", "ABSENT", "HALF_DAY"),
+      type: DataTypes.ENUM("PRESENT", "ABSENT", "HALF_DAY", "LEAVE", "HOLIDAY"),
       defaultValue: "ABSENT",
     },
 
@@ -57,5 +57,11 @@ export const AttendanceDaily = sequelize.define(
   {
     tableName: "attendance_daily",
     timestamps: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ["employeeId", "date"],
+      },
+    ],
   }
 );

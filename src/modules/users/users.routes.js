@@ -4,7 +4,9 @@ import {
   getUsers,
   updateUser,
   deleteUser,
+  getRoles,
 } from "./users.controller.js";
+import { allowRoles } from "../../shared/middlewares/role.js";
 
 import authMiddleware from "../../shared/middlewares/auth.js";
 import validate from "../../shared/middlewares/validate.js";
@@ -14,6 +16,8 @@ import companyAccess from "../../shared/middlewares/companyAccess.js";
 const router = express.Router();
 
 router.use(authMiddleware);
+
+router.get("/roles", allowRoles("super_admin"), getRoles);
 router.use(companyAccess());
 
 router.post("/", validate(createUserSchema), createUser);

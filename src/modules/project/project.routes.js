@@ -2,6 +2,7 @@ import express from "express";
 import * as projectController from "./project.controller.js";
 import authMiddleware from "../../shared/middlewares/auth.js";
 import companyAccess from "../../shared/middlewares/companyAccess.js";
+import { uploadProjectFile } from "../../shared/utils/projectUpload.js";
 
 const router = express.Router();
 
@@ -28,6 +29,15 @@ router.put("/progress/:id", projectController.updateProjectProgress);
    TEAM & EMPLOYEE PROJECT HISTORY
 ===================================================== */
 router.get("/:id/members", projectController.getProjectMembers);
+router.delete("/:id/members/:employeeId", projectController.removeEmployeeFromProject);
 router.get("/employees/:id/projects", projectController.getEmployeeProjects);
+
+/* =====================================================
+   PROJECT FILE MANAGEMENT
+===================================================== */
+router.post("/:id/files", uploadProjectFile.single('file'), projectController.uploadProjectFile);
+router.get("/:id/files", projectController.getProjectFiles);
+router.delete("/files/:fileId", projectController.deleteProjectFile);
+
 
 export default router;

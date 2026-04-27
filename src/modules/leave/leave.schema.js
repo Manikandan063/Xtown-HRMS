@@ -12,11 +12,11 @@ export const updateLeaveTypeSchema = z.object({
 });
 
 export const createLeaveRequestSchema = z.object({
-  employeeId: z.number(),
-  leaveTypeId: z.number(),
-  fromDate: z.string(),
-  toDate: z.string(),
-  reason: z.string().optional(),
+  employeeId: z.union([z.string(), z.number()], { required_error: "Employee context is missing" }),
+  leaveTypeId: z.union([z.string(), z.number()], { required_error: "Please select a leave category" }),
+  fromDate: z.string({ required_error: "Start date is required" }).min(1, "Start date is required"),
+  toDate: z.string({ required_error: "End date is required" }).min(1, "End date is required"),
+  reason: z.string().min(1, "Reason for leave is required"),
 });
 
 export const updateLeaveStatusSchema = z.object({

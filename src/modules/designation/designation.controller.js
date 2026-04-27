@@ -4,8 +4,8 @@ import {
   updateDesignationSchema,
 } from "./designation.schema.js";
 
-import asyncHandler from "../../shared/asyncHandler.js";
-import AppError from "../../shared/appError.js";
+import asyncHandler from "../../shared/utils/asyncHandler.js";
+import AppError from "../../shared/utils/appError.js";
 
 export const createDesignation = asyncHandler(async (req, res) => {
   const validated = createDesignationSchema.parse(req.body);
@@ -22,13 +22,14 @@ export const createDesignation = asyncHandler(async (req, res) => {
 });
 
 export const getAllDesignations = asyncHandler(async (req, res) => {
-  const designations = await designationService.getAllDesignations(
-    req.user.companyId
+  const result = await designationService.getAllDesignations(
+    req.user.companyId,
+    req.query
   );
 
   res.json({
     success: true,
-    data: designations,
+    ...result
   });
 });
 

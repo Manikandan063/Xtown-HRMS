@@ -1,8 +1,9 @@
-import AppError from "../appError.js";
+import AppError from "../utils/appError.js";
 
 const companyAccess = (modelName = "Resource") => {
   return (req, res, next) => {
-    const isSuperAdmin = req.user?.role === "Super Admin";
+    const rawRole = String(req.user?.role || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const isSuperAdmin = rawRole === "superadmin";
 
     if (isSuperAdmin) {
       return next(); // SuperAdmin bypass

@@ -5,9 +5,12 @@ import { z } from "zod";
 export const createPayrollSchema = z.object({
   employeeId: z.string().uuid(),
   month: z.string(),
-  basicSalary: z.coerce.number(),
-  allowances: z.coerce.number().optional(),
-  deductions: z.coerce.number().optional(),
+  overtimeHours: z.coerce.number().optional(),
+  overtimeRate: z.coerce.number().optional(),
+});
+
+export const createBatchPayrollSchema = z.object({
+  month: z.string(),
 });
 
 export const updatePaymentStatusSchema = z.object({

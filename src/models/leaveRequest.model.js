@@ -46,6 +46,9 @@ export const LeaveRequest = sequelize.define(
     approvedAt: {
       type: DataTypes.DATE,
     },
+    viewedAt: {
+      type: DataTypes.DATE,
+    },
   },
   { timestamps: true }
 );

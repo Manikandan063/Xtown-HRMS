@@ -32,15 +32,55 @@ export const Company = sequelize.define(
     address: {
       type: DataTypes.TEXT,
     },
+    
+    domain: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    registrationNumber: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
 
     subscriptionPlan: {
       type: DataTypes.ENUM("BASIC", "PREMIUM", "ENTERPRISE"),
       defaultValue: "BASIC",
     },
 
+    currentPlanId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+
+    planStartDate: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+
+    planExpiryDate: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+
     isActive: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,
+    },
+
+    status: {
+      type: DataTypes.ENUM("ACTIVE", "BLOCKED"),
+      defaultValue: "ACTIVE",
+    },
+
+    workingStartTime: {
+      type: DataTypes.STRING,
+      defaultValue: "09:30",
+    },
+
+    workingEndTime: {
+      type: DataTypes.STRING,
+      defaultValue: "17:30",
     },
   },
   {

@@ -137,6 +137,16 @@ export default (sequelize) => {
           key: "id",
         },
       },
+      welcomeEmailSent: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        field: "welcome_email_sent"
+      },
+      canResign: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: false,
+      },
     },
     {
       tableName: "employees",
@@ -150,6 +160,10 @@ export default (sequelize) => {
         {
           unique: true,
           fields: ["companyId", "officialEmail"],
+        },
+        {
+          unique: true,
+          fields: ["companyId", "officialPhone"],
         },
       ],
     }

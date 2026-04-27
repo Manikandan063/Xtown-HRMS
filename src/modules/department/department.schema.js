@@ -6,7 +6,9 @@ export const createDepartmentSchema = z.object({
     .min(2, "Department name must be at least 2 characters")
     .max(100),
 
-  description: z.string().max(255).optional(),
+  code: z.string().max(20).optional().nullable(),
+  description: z.string().max(255).optional().nullable(),
+  headId: z.string().uuid().optional().nullable(),
 });
 
 export const updateDepartmentSchema = z.object({
@@ -16,7 +18,8 @@ export const updateDepartmentSchema = z.object({
     .max(100)
     .optional(),
 
-  description: z.string().max(255).optional(),
-
+  code: z.string().max(20).optional().nullable(),
+  description: z.string().max(255).optional().nullable(),
+  headId: z.string().uuid().optional().nullable(),
   isActive: z.boolean().optional(),
 });

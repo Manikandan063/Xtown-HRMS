@@ -1,5 +1,5 @@
 import express from "express";
-import { getDashboardSummary } from "./dashboard.controller.js";
+import { getDashboardSummary, exportAllData } from "./dashboard.controller.js";
 
 import authMiddleware from "../../shared/middlewares/auth.js";
 import { allowRoles } from "../../shared/middlewares/role.js";
@@ -16,9 +16,16 @@ const router = express.Router();
 router.get(
   "/summary",
   authMiddleware,
-  allowRoles("Super Admin", "Admin"),
-  isHRorMD, // Allows HR (Full) or MD (Read-only)
   getDashboardSummary
 );
+
+router.get(
+  "/export-all",
+  authMiddleware,
+  allowRoles("Admin", "Super Admin"),
+  exportAllData
+);
+
+
 
 export default router;

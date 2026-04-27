@@ -2,6 +2,7 @@ import express from "express";
 import * as employeeController from "./employee.controller.js";
 import authMiddleware from "../../shared/middlewares/auth.js";
 import companyAccess from "../../shared/middlewares/companyAccess.js";
+import { uploadProfile } from "../../shared/utils/upload.js";
 
 const router = express.Router();
 
@@ -37,5 +38,9 @@ router.put("/:id/contact", employeeController.updateContactDetail);
 router.put("/:id/legal", employeeController.updateLegalDetail);
 router.put("/:id/certification", employeeController.updateCertification);
 router.put("/:id/asset", employeeController.updateAsset);
+router.post("/:id/profile-image", uploadProfile.single('image'), employeeController.updateProfileImage);
+router.delete("/:id/profile-image", employeeController.deleteProfileImage);
+router.patch("/:id/toggle-resignation", employeeController.toggleResignation);
+router.post("/:id/request-resignation", employeeController.requestResignationAccess);
 
 export default router;

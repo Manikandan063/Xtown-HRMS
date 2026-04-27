@@ -1,4 +1,4 @@
-import asyncHandler from "../../shared/asyncHandler.js";
+import asyncHandler from "../../shared/utils/asyncHandler.js";
 import {
   getEmployeeReportService,
   getAttendanceReportService,

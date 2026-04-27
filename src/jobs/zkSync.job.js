@@ -1,4 +1,4 @@
-import { syncZKTecoAttendance } from "../modules/attendance/services/zkSync.service.js";
+import { syncZKTecoAttendance } from "../modules/attendance/attendance.service.js";
 import { db } from "../models/initModels.js";
 import dotenv from "dotenv";
 
@@ -7,37 +7,48 @@ dotenv.config();
 const { Company } = db;
 
 const SYNC_INTERVAL_MS = process.env.ZK_SYNC_INTERVAL_MS || 60000; // Default 1 minute
-const ZK_DEVICE_IP = process.env.ZK_DEVICE_IP;
-const ZK_DEVICE_PORT = process.env.ZK_DEVICE_PORT || 4370;
 
 export const startZKSyncJob = () => {
-  if (!ZK_DEVICE_IP) {
-    console.warn("⚠ ZK_DEVICE_IP not set. Skipping ZK Auto Sync Job.");
-    return;
-  }
-
   console.log(`⏱ Starting ZKTeco Auto-Sync Job every ${SYNC_INTERVAL_MS / 1000} seconds...`);
 
   setInterval(async () => {
     try {
-      // In a real multi-tenant scenario, we would iterate through companies that have devices configured.
-      // For now, grabbing the first company, or we can assume IP is tied to a specific company ID.
-      // Using a fallback to fetch the first company here as a baseline
-      const company = await Company.findOne();
+      const { Terminal } = db;
       
-      if (!company) {
-        console.warn("⚠ No company found for ZK Sync.");
+      // Fetch all active terminals across all companies
+      const terminals = await Terminal.findAll({ where: { status: "ACTIVE" } });
+      
+      if (terminals.length === 0) {
+        // Only log if we expect terminals but none found, otherwise stay quiet
         return;
       }
 
-      console.log(`[${new Date().toISOString()}] 🔄 Running Automatic ZK Sync...`);
-      const result = await syncZKTecoAttendance(ZK_DEVICE_IP, ZK_DEVICE_PORT, company.id);
+      console.log(`[${new Date().toISOString()}] 🔄 Running Automatic ZK Sync for ${terminals.length} terminals...`);
       
-      if (result.count > 0) {
-        console.log(`✅ Automatic ZK Sync Completed: ${result.message}`);
+      for (const terminal of terminals) {
+        try {
+          const ip = terminal.ip?.trim();
+          const port = parseInt(terminal.port) || 4370;
+
+          if (!ip) {
+            console.warn(`[ZK Sync] Terminal ${terminal.name} has no IP address. Skipping.`);
+            continue;
+          }
+
+          const result = await syncZKTecoAttendance(ip, port, terminal.companyId);
+          if (result.count > 0) {
+            console.log(`✅ Auto-Sync [${terminal.name}]: ${result.message}`);
+          }
+          
+          // Update last sync time
+          await terminal.update({ lastSync: new Date() });
+        } catch (err) {
+          console.error(`❌ Auto-Sync [${terminal.name}] Failed:`, err.message);
+        }
       }
     } catch (error) {
-      console.error("❌ Automatic ZK Sync Failed:", error.message);
+      console.error("❌ Global ZK Sync Job Error:", error.message);
     }
   }, SYNC_INTERVAL_MS);
 };
+

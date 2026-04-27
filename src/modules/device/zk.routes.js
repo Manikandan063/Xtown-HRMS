@@ -110,9 +110,20 @@
 
 import express from "express";
 import { syncZkAttendance } from "./zk.controller.js";
+import * as terminalController from "./terminal.controller.js";
+import authMiddleware from "../../shared/middlewares/auth.js";
 
 const router = express.Router();
 
+router.use(authMiddleware);
+
+// Terminal Management
+router.get("/", terminalController.getTerminals);
+router.post("/", terminalController.createTerminal);
+router.put("/:id", terminalController.updateTerminal);
+router.delete("/:id", terminalController.deleteTerminal);
+
+// Sync Logic
 router.post("/sync-attendance", syncZkAttendance);
 
 export default router;

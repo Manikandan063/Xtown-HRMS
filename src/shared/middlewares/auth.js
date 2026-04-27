@@ -1,9 +1,9 @@
 import jwt from "jsonwebtoken";
-import { User } from "../../models/user.model.js";
-import { Role } from "../../models/role.model.js";
-import AppError from "../appError.js";
+import { User, Role, Employee, Company } from "../../models/initModels.js";
+import AppError from "../utils/appError.js";
 
 const authMiddleware = async (req, res, next) => {
+  console.log(`[AUTH-MW] Checking token for: ${req.method} ${req.url}`);
   try {
     const authHeader = req.headers.authorization;
 
@@ -16,31 +16,77 @@ const authMiddleware = async (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Find user with role
+    // Find user or employee based on role in token
+    let authenticatedUser = null;
+
+    // 1. Check Users table first
     const user = await User.findByPk(decoded.userId, {
-      include: {
-        model: Role,
-        as: "role",
-        attributes: ["name"],
-      },
+      include: [
+        {
+          model: Role,
+          as: "role",
+          attributes: ["name"],
+        },
+        {
+          model: Company,
+          as: "company",
+          attributes: ["status"]
+        }
+      ],
     });
 
-    if (!user) {
-      return next(new AppError("User not found", 404));
+    if (user) {
+      // 🟢 SuperAdmin Bypass
+      const isSuperAdmin = user.role?.name === "super_admin";
+      
+      // 🔴 Blocked Company Check
+      if (!isSuperAdmin && user.company?.status === "BLOCKED") {
+        return next(new AppError("Your company account is disabled. Contact administrator.", 403));
+      }
+
+      authenticatedUser = {
+        userId: user.id,
+        employeeId: user.employeeId,
+        email: user.email,
+        role: user.role?.name || 'admin',
+        companyId: user.companyId,
+        companyStatus: user.company?.status,
+        designation: user.designation,
+      };
+    } else {
+      // 2. Fallback to Employee table
+      const employee = await Employee.findByPk(decoded.userId, {
+        include: {
+          model: Company,
+          as: "company",
+          attributes: ["status"]
+        }
+      });
+
+      if (employee) {
+        // 🔴 Blocked Company Check
+        if (employee.company?.status === "BLOCKED") {
+          return next(new AppError("Your company account is disabled. Contact administrator.", 403));
+        }
+
+        authenticatedUser = {
+          userId: employee.id,
+          employeeId: employee.id,
+          email: employee.officialEmail,
+          role: 'user',
+          companyId: employee.companyId,
+          companyStatus: employee.company?.status,
+          designation: 'employee',
+        };
+      }
     }
 
-    if (!user.role) {
-      return next(new AppError("User role not found", 500));
+    if (!authenticatedUser) {
+      return next(new AppError("Session invalid - user not found in records", 404));
     }
 
     // Attach minimal clean payload
-    req.user = {
-      userId: user.id,
-      email: user.email,
-      role: user.role.name,
-      companyId: user.companyId,
-      designation: user.designation,
-    };
+    req.user = authenticatedUser;
 
     next();
   } catch (error) {

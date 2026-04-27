@@ -9,11 +9,13 @@ router.use(authMiddleware);
 // Leave Type
 router.post("/type", leaveController.createLeaveType);
 router.get("/type", leaveController.getLeaveTypes);
+router.delete("/type/:id", leaveController.deleteLeaveType);
 
 // Leave Request
 router.post("/request", leaveController.createLeaveRequest);
 router.get("/request", leaveController.getLeaveRequests);
 router.patch("/request/:id/status", leaveController.updateLeaveStatus);
+router.patch("/request/:id/view", leaveController.viewLeaveRequest);
 
 // Holidays
 router.post("/holidays", async (req, res) => {

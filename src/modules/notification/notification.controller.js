@@ -1,4 +1,4 @@
-import asyncHandler from "../../shared/asyncHandler.js";
+import asyncHandler from "../../shared/utils/asyncHandler.js";
 import { createNotificationSchema } from "./notification.schema.js";
 import {
   createNotification,
@@ -36,7 +36,7 @@ export const markNotificationReadController = asyncHandler(async (req, res) => {
 export const getUnreadCountController = asyncHandler(async (req, res) => {
   const count = await getUnreadCount(
     req.user.companyId,
-    req.user.id
+    req.user.userId
   );
 
   res.json({
@@ -46,7 +46,7 @@ export const getUnreadCountController = asyncHandler(async (req, res) => {
 });
 
 export const markAllAsReadController = asyncHandler(async (req, res) => {
-  await markAllAsRead(req.user.companyId, req.user.id);
+  await markAllAsRead(req.user.companyId, req.user.userId);
 
   res.json({
     success: true,
@@ -59,7 +59,7 @@ export const getMyNotificationsController = asyncHandler(async (req, res) => {
 
   const result = await getUserNotifications(
     req.user.companyId,
-    req.user.id,
+    req.user.userId,
     page,
     limit
   );

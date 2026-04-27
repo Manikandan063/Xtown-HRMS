@@ -27,6 +27,10 @@ export default (sequelize) => {
       description: {
         type: DataTypes.TEXT,
       },
+      type: {
+        type: DataTypes.ENUM("HOLIDAY", "EVENT"),
+        defaultValue: "HOLIDAY",
+      },
     },
     {
       tableName: "holidays",

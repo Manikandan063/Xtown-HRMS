@@ -1,5 +1,5 @@
 import { db } from "../../models/initModels.js";
-import AppError from "../../shared/appError.js";
+import AppError from "../../shared/utils/appError.js";
 
 const { CompanySettings, SystemSettings, RolePermission, Shift } = db;
 

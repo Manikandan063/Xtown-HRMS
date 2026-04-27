@@ -8,8 +8,8 @@ const router = express.Router();
 
 router.use(authMiddleware);
 
-// MD / HR can see the summary
-router.get("/summary", checkRole("SUPER_ADMIN", "ADMIN"), isHRorMD, payrollController.getPayrollSummary);
+// Summary is now accessible to all roles (Logic handled in controller)
+router.get("/summary", checkRole("SUPER_ADMIN", "ADMIN", "USER"), payrollController.getPayrollSummary);
 
 // HR has full control over processing payroll and updating status
 router.post("/create", checkRole("SUPER_ADMIN", "ADMIN"), isHR, payrollController.createPayroll);

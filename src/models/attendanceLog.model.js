@@ -60,6 +60,30 @@ export const AttendanceLog = sequelize.define(
       type: DataTypes.JSON, // { lat: number, lng: number, address: string }
       allowNull: true,
     },
+    latitude: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+    longitude: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+    imageUrl: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    checkpointId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+    locationStatus: {
+      type: DataTypes.ENUM("VALID", "OUTSIDE"),
+      defaultValue: "VALID",
+    },
+    approvalStatus: {
+      type: DataTypes.ENUM("AUTO", "PENDING", "APPROVED", "REJECTED"),
+      defaultValue: "AUTO",
+    },
   },
   {
     tableName: "attendance_logs",

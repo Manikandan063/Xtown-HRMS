@@ -1,7 +1,10 @@
+import { Op } from "sequelize";
 import PDFDocument from "pdfkit";
-import { Employee, EmployeeSalary, Payroll, SalaryAdjustment } from "../../models/initModels.js";
-import AppError from "../../shared/appError.js";
+import { Employee, EmployeeSalary, Payroll, SalaryAdjustment, Company } from "../../models/initModels.js";
+import AppError from "../../shared/utils/appError.js";
 import { sequelize } from "../../config/db.js";
+import { sendEmail } from "../../shared/utils/emailSender.js";
+import { generatePayslipToBuffer } from "../../shared/utils/generatePayslip.js";
 
 export const createPayroll = async (data, companyId) => {
   const { employeeId, month, overtimeHours = 0, overtimeRate = 0 } = data;
@@ -53,24 +56,123 @@ export const createPayroll = async (data, companyId) => {
   return payroll;
 };
 
-export const getCompanyPayrolls = async (companyId) => {
-  return await Payroll.findAll({ 
+export const getCompanyPayrolls = async (companyId, query = {}) => {
+  const page = parseInt(query.page) || 1;
+  const limit = parseInt(query.limit) || 10;
+  const offset = (page - 1) * limit;
+
+  const { rows, count } = await Payroll.findAndCountAll({ 
     where: { companyId },
-    include: [{ model: Employee, attributes: ["firstName", "lastName", "employeeCode"] }]
+    limit,
+    offset,
+    include: [{ model: Employee, attributes: ["firstName", "lastName", "employeeCode"] }],
+    order: [['createdAt', 'DESC']]
   });
+
+  return {
+    total: count,
+    page,
+    limit,
+    data: rows
+  };
 };
 
-export const getEmployeePayrolls = async (employeeId, companyId) => {
-  return await Payroll.findAll({ where: { employeeId, companyId } });
+export const getEmployeePayrolls = async (employeeId, companyId, query = {}) => {
+  const page = parseInt(query.page) || 1;
+  const limit = parseInt(query.limit) || 10;
+  const offset = (page - 1) * limit;
+
+  const { rows, count } = await Payroll.findAndCountAll({ 
+    where: { employeeId, companyId },
+    limit,
+    offset,
+    order: [['createdAt', 'DESC']]
+  });
+
+  return {
+    total: count,
+    page,
+    limit,
+    data: rows
+  };
 };
 
 export const updatePaymentStatus = async (id, status, companyId) => {
-  const payroll = await Payroll.findOne({ where: { id, companyId } });
+  console.log(`[PAYROLL] Received status update request: ID=${id}, Status=${status}`);
+  const payroll = await Payroll.findOne({ 
+    where: { id, companyId },
+    include: [
+      { model: Employee, attributes: ["id", "firstName", "lastName", "officialEmail"] },
+      { model: Company }
+    ]
+  });
   if (!payroll) throw new AppError("Payroll not found", 404);
 
   payroll.paymentStatus = status;
   if (status === "PAID") {
     payroll.paidDate = new Date();
+
+    // Send Payment Confirmation Email
+    if (payroll.Employee?.officialEmail) {
+      console.log(`[PAYROLL] Data Check - Employee Name: ${payroll.Employee.firstName}, Email: ${payroll.Employee.officialEmail}`);
+      console.log(`[PAYROLL] Salary paid for ${payroll.Employee.firstName}. Generating PDF and sending email...`);
+      
+      try {
+        // Generate PDF Buffer
+        const pdfBuffer = await generatePayslipToBuffer(payroll, payroll.Employee, payroll.Company);
+
+        const subject = `Salary Disbursed - ${payroll.month}`;
+        const html = `
+            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1f2937; max-width: 600px; margin: auto; border: 1px solid #e5e7eb; border-radius: 24px; background-color: #ffffff;">
+               <div style="text-align: center; margin-bottom: 30px;">
+                  <div style="background-color: #f3f4f6; width: 64px; height: 64px; border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+                     <span style="font-size: 32px;">💰</span>
+                  </div>
+                  <h2 style="color: #111827; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.025em; text-transform: uppercase;">Salary Disbursed</h2>
+                  <p style="color: #6b7280; font-size: 14px; margin-top: 4px;">Monthly compensation node synchronized</p>
+               </div>
+
+               <div style="border-top: 1px solid #f3f4f6; padding-top: 30px; margin-bottom: 30px;">
+                  <p style="font-size: 16px; line-height: 1.6;">Hello <b>${payroll.Employee.firstName} ${payroll.Employee.lastName}</b>,</p>
+                  <p style="font-size: 16px; line-height: 1.6; color: #4b5563;">We are pleased to inform you that your salary for the month of <b>${payroll.month}</b> has been successfully disbursed. Please find your official payslip attached to this email.</p>
+               </div>
+
+               <div style="background-color: #f9fafb; padding: 32px; border-radius: 20px; text-align: center; border: 1px solid #f3f4f6;">
+                  <p style="margin: 0; font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: 700; letter-spacing: 0.1em; margin-bottom: 8px;">Net Amount Disbursed</p>
+                  <p style="margin: 0; font-size: 40px; font-weight: 900; color: #059669; letter-spacing: -0.05em;">₹${payroll.netSalary?.toLocaleString('en-IN')}</p>
+               </div>
+
+               <div style="margin-top: 30px; text-align: center;">
+                  <p style="font-size: 14px; color: #6b7280; line-height: 1.5;">You can also view and download your full historical financial breakdown from the employee portal.</p>
+               </div>
+
+               <div style="border-top: 1px solid #f3f4f6; margin-top: 40px; padding-top: 30px;">
+                  <p style="font-size: 13px; color: #9ca3af; line-height: 1.6;">
+                     Regards,<br>
+                     <b style="color: #4b5563;">Finance & Operations</b><br>
+                     XTown HRMS Corporation
+                  </p>
+               </div>
+            </div>
+         `;
+
+        const attachments = [
+            {
+                filename: `payslip-${payroll.month}.pdf`,
+                content: pdfBuffer,
+                contentType: 'application/pdf'
+            }
+        ];
+
+        sendEmail(payroll.Employee.officialEmail, subject, `Your salary for ${payroll.month} has been disbursed.`, html, attachments)
+          .then(() => console.log(`[PAYROLL] Email with PDF sent successfully to ${payroll.Employee.officialEmail}`))
+          .catch(err => console.error(`[PAYROLL] FATAL ERROR sending email to ${payroll.Employee.officialEmail}:`, err));
+      } catch (pdfErr) {
+        console.error("[PAYROLL] PDF Generation failed:", pdfErr);
+      }
+    } else {
+      console.warn(`[PAYROLL] Skip email: No official email found for employee ID: ${payroll.employeeId}`);
+    }
   }
   return await payroll.save();
 };
@@ -236,9 +338,87 @@ export const getPayrollSummary = async (companyId) => {
 
   return {
     month: currentMonth,
-    totalSalary: totalSalary || 0,
-    totalEmployeesPaid: totalEmployees,
-    pendingPayments,
-    paidPayments
+    totalNetSalary: totalSalary || 0,
+    employeesPaid: totalEmployees,
+    pendingPayrolls: pendingPayments,
+    paidPayrolls: paidPayments
   };
+};
+
+export const getEmployeePayrollSummary = async (companyId, employeeId) => {
+  const currentYear = new Date().getFullYear();
+  
+  // 1. Total Net Salary for the year
+  const totalEarnings = await Payroll.sum("netSalary", { 
+    where: { 
+      employeeId, 
+      companyId,
+      paymentStatus: 'PAID',
+      month: { [Op.like]: `${currentYear}-%` }
+    } 
+  });
+
+  // 2. Latest Net Salary
+  const latestPayroll = await Payroll.findOne({
+    where: { employeeId, companyId, paymentStatus: 'PAID' },
+    order: [['month', 'DESC']]
+  });
+
+  // 3. Total Deductions for the year
+  const totalDeductions = await Payroll.sum("deductions", {
+    where: { 
+      employeeId, 
+      companyId,
+      month: { [Op.like]: `${currentYear}-%` }
+    }
+  });
+
+  return {
+    totalEarnings: totalEarnings || 0,
+    latestSalary: latestPayroll?.netSalary || 0,
+    totalDeductions: totalDeductions || 0,
+    monthCount: latestPayroll ? 1 : 0 // Simplified indicator
+  };
+};
+
+/* ===============================
+   BATCH PAYROLL GENERATION
+=============================== */
+export const createBatchPayroll = async (month, companyId) => {
+    // 1. Fetch all active employees for this company
+    const employees = await Employee.findAll({
+        where: { companyId, status: 'ACTIVE' }
+    });
+
+    if (employees.length === 0) {
+        throw new AppError("No active employees found in company", 404);
+    }
+
+    const results = {
+        processed: 0,
+        skipped: 0,
+        errors: []
+    };
+
+    for (const emp of employees) {
+        try {
+            // Check if payroll already exists for this month
+            const exists = await Payroll.findOne({
+                where: { employeeId: emp.id, month, companyId }
+            });
+
+            if (exists) {
+                results.skipped++;
+                continue;
+            }
+
+            // Create payroll for this employee
+            await createPayroll({ employeeId: emp.id, month }, companyId);
+            results.processed++;
+        } catch (err) {
+            results.errors.push({ employeeId: emp.id, error: err.message });
+        }
+    }
+
+    return results;
 };

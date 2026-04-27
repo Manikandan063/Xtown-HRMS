@@ -1,4 +1,6 @@
-import asyncHandler from "../../shared/asyncHandler.js";
+import asyncHandler from "../../shared/utils/asyncHandler.js";
+import fs from "fs";
+import path from "path";
 import * as employeeService from "./employee.service.js";
 import {
   createEmployeeSchema,
@@ -7,6 +9,7 @@ import {
   updatePersonalSchema,
   updateBankDetailSchema,
 } from "./employee.schema.js";
+import { db } from "../../models/initModels.js";
 
 /* =====================================================
    CREATE EMPLOYEE
@@ -231,4 +234,83 @@ export const updateAsset = asyncHandler(async (req, res) => {
     req.user.companyId
   );
   res.json({ success: true, data: result });
+});
+
+export const updateProfileImage = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    throw new Error("No image file uploaded");
+  }
+
+
+  const { Employee } = db;
+  const employee = await Employee.findOne({ 
+    where: { id: req.params.id, companyId: req.user.companyId } 
+  });
+
+  if (!employee) {
+    throw new Error("Employee not found");
+  }
+
+  const imagePath = `/uploads/profiles/${req.file.filename}`;
+  employee.profileImage = imagePath;
+  await employee.save();
+
+  res.json({
+    success: true,
+    message: "Profile image updated successfully",
+    data: employee
+  });
+});
+
+export const deleteProfileImage = asyncHandler(async (req, res) => {
+  const { Employee } = db;
+  const employee = await Employee.findOne({ 
+    where: { id: req.params.id, companyId: req.user.companyId } 
+  });
+
+  if (!employee) {
+    throw new Error("Employee not found");
+  }
+
+  // Remove file from disk if it exists
+  if (employee.profileImage) {
+    const fullPath = path.join(process.cwd(), employee.profileImage.startsWith('/') ? employee.profileImage.slice(1) : employee.profileImage);
+    if (fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath);
+    }
+  }
+
+  employee.profileImage = null;
+  await employee.save();
+
+  res.json({
+    success: true,
+    message: "Profile image removed successfully",
+    data: employee
+  });
+});
+
+export const toggleResignation = asyncHandler(async (req, res) => {
+  const employee = await employeeService.toggleResignationAccess(
+    req.params.id,
+    req.user
+  );
+
+  res.json({
+    success: true,
+    message: `Resignation access ${employee.canResign ? 'enabled' : 'disabled'} successfully`,
+    data: employee,
+  });
+});
+
+export const requestResignationAccess = asyncHandler(async (req, res) => {
+  await employeeService.requestResignationAccess(
+    req.params.id,
+    req.user
+  );
+
+  res.json({
+    success: true,
+    message: "Resignation access request sent to HR successfully.",
+  });
 });

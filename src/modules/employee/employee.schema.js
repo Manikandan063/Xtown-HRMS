@@ -5,7 +5,7 @@ import { z } from "zod";
 ============================== */
 
 export const createEmployeeSchema = z.object({
-  employeeCode: z.string().min(1),
+  employeeCode: z.string().optional().or(z.literal("")),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
   officialEmail: z.string().email(),
@@ -27,12 +27,6 @@ export const createEmployeeSchema = z.object({
 });
 
 /* ==============================
-   UPDATE EMPLOYEE
-============================== */
-
-export const updateEmployeeSchema = createEmployeeSchema.partial();
-
-/* ==============================
    QUERY (Pagination)
 ============================== */
 
@@ -40,6 +34,7 @@ export const employeeQuerySchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),
   search: z.string().optional(),
+  departmentId: z.string().optional(),
 });
 
 /* ==============================
@@ -90,8 +85,20 @@ export const updateContactDetailSchema = z.object({
 ============================== */
 
 export const updateLegalDetailSchema = z.object({
-  panNumber: z.string().optional(),
-  aadhaarNumber: z.string().optional(),
+  panNumber: z
+    .string()
+    .regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, {
+      message: "Invalid PAN format. Must be 10 characters (e.g. ABCDE1234F) without special symbols."
+    })
+    .optional()
+    .or(z.literal("")),
+  aadhaarNumber: z
+    .string()
+    .regex(/^[2-9]{1}[0-9]{11}$/, {
+      message: "Invalid Aadhaar format. Must be 12 digits starting with 2-9 without special symbols."
+    })
+    .optional()
+    .or(z.literal("")),
   pfNumber: z.string().optional(),
   esiNumber: z.string().optional(),
   taxCategory: z.string().optional(),
@@ -197,4 +204,16 @@ export const updateDocumentSchema = z.object({
   filePath: z.string().min(1),
   verificationStatus: z.enum(["PENDING", "VERIFIED", "REJECTED"]).optional(),
   remarks: z.string().optional(),
+});
+
+/* ==============================
+   UPDATE EMPLOYEE
+============================== */
+
+export const updateEmployeeSchema = createEmployeeSchema.partial().extend({
+  personalDetail: updatePersonalSchema.partial().optional(),
+  contactDetail: updateContactDetailSchema.partial().optional(),
+  legalDetail: updateLegalDetailSchema.partial().optional(),
+  salary: updateSalarySchema.partial().optional(),
+  bankDetail: updateBankDetailSchema.partial().optional(),
 });

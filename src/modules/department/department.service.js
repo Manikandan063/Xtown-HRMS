@@ -1,5 +1,5 @@
 import { db } from "../../models/initModels.js";
-import AppError from "../../shared/appError.js";
+import AppError from "../../shared/utils/appError.js";
 
 const { Department } = db;
 
@@ -21,11 +21,44 @@ export const createDepartment = async (companyId, data) => {
   });
 };
 
-export const getAllDepartments = async (companyId) => {
-  return await Department.findAll({
+export const getAllDepartments = async (companyId, query = {}) => {
+  const page = parseInt(query.page) || 1;
+  const limit = parseInt(query.limit) || 10;
+  const offset = (page - 1) * limit;
+
+  const { rows, count } = await Department.findAndCountAll({
     where: { companyId },
+    limit,
+    offset,
+    attributes: {
+      include: [
+        [
+          db.sequelize.literal(`(
+            SELECT COUNT(*)
+            FROM "employees"
+            WHERE "employees"."departmentId" = "Department"."id"
+            AND "employees"."deletedAt" IS NULL
+          )`),
+          'employeeCount'
+        ]
+      ]
+    },
+    include: [
+      {
+        model: db.Employee,
+        as: "head",
+        attributes: ["id", "firstName", "lastName", "employeeCode"],
+      },
+    ],
     order: [["createdAt", "DESC"]],
   });
+
+  return {
+    total: count,
+    page,
+    limit,
+    data: rows
+  };
 };
 
 export const updateDepartment = async (id, companyId, data) => {

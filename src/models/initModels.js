@@ -36,6 +36,18 @@ import resignationModel from "./resignation.model.js";
 import salaryAdjustmentModel from "./salaryAdjustment.model.js";
 import holidayModel from "./holiday.model.js";
 import documentModel from "./document.model.js";
+import { SubscriptionRequest } from "./subscriptionRequest.model.js";
+import { SubscriptionPlan } from "./subscriptionPlan.model.js";
+import { Checkpoint } from "./checkpoint.model.js";
+import terminalModel from "./terminal.model.js";
+import exitChecklistModel from "./exitChecklist.model.js";
+import locationLogModel from "./locationLog.model.js";
+import projectFileModel from "./projectFile.model.js";
+import { supportMessageModel } from "./supportMessage.model.js";
+import { supportTicketModel } from "./supportTicket.model.js";
+import { chatMessageModel } from "./chatMessage.model.js";
+import { documentVaultModel } from "./documentVault.model.js";
+
 
 /* ==============================
    INITIALIZE FUNCTION MODELS
@@ -66,6 +78,15 @@ export const Resignation = resignationModel(sequelize);
 export const SalaryAdjustment = salaryAdjustmentModel(sequelize);
 export const Holiday = holidayModel(sequelize);
 export const Document = documentModel(sequelize);
+export const Terminal = terminalModel(sequelize);
+export const ExitChecklist = exitChecklistModel(sequelize);
+export const LocationLog = locationLogModel(sequelize);
+export const ProjectFile = projectFileModel(sequelize);
+export const SupportMessage = supportMessageModel(sequelize);
+export const SupportTicket = supportTicketModel(sequelize);
+export const ChatMessage = chatMessageModel(sequelize);
+export const DocumentVault = documentVaultModel(sequelize);
+
 
 /* ==============================
    EXPORT DB OBJECT
@@ -107,7 +128,19 @@ export const db = {
   SalaryAdjustment,
   Holiday,
   Document,
+  SubscriptionRequest,
+  SubscriptionPlan,
+  Checkpoint,
+  Terminal,
+  ExitChecklist,
+  LocationLog,
+  ProjectFile,
+  SupportMessage,
+  SupportTicket,
+  ChatMessage,
+  DocumentVault,
 };
+
 
 
 export {
@@ -119,6 +152,8 @@ export {
   AttendanceDaily,
   LeaveType,
   LeaveRequest,
+  SubscriptionRequest,
+  SubscriptionPlan,
 };
 
 /* ==============================
@@ -152,6 +187,11 @@ export const initModels = async () => {
       as: "company",
     });
 
+    Company.belongsTo(SubscriptionPlan, {
+      foreignKey: "currentPlanId",
+      as: "planDetail"
+    });
+
     /* ==============================
        COMPANY ↔ DEPARTMENT
     ============================== */
@@ -163,6 +203,11 @@ export const initModels = async () => {
     Department.belongsTo(Company, {
       foreignKey: "companyId",
       as: "company",
+    });
+    
+    Department.belongsTo(Employee, {
+      foreignKey: "headId",
+      as: "head",
     });
 
     /* ==============================
@@ -378,6 +423,7 @@ export const initModels = async () => {
 
     EmployeeAsset.belongsTo(Employee, {
       foreignKey: "employeeId",
+      as: "employee"
     });
 
     /* ==============================
@@ -417,11 +463,14 @@ export const initModels = async () => {
     Employee.hasMany(LeaveBalance, { foreignKey: "employeeId" });
     LeaveBalance.belongsTo(Employee, { foreignKey: "employeeId" });
     LeaveType.hasMany(LeaveBalance, { foreignKey: "leaveTypeId" });
-    LeaveBalance.belongsTo(LeaveType, { foreignKey: "leaveTypeId" });
+    LeaveBalance.belongsTo(LeaveType, { foreignKey: "leaveTypeId", as: "leaveType" });
 
 
     AttendanceLog.belongsTo(Employee, { foreignKey: "employeeId" });
     AttendanceDaily.belongsTo(Employee, { foreignKey: "employeeId" });
+
+    AttendanceDaily.hasMany(AttendanceLog, { foreignKey: "employeeId", sourceKey: "employeeId", as: "AttendanceLogs" });
+    AttendanceLog.belongsTo(AttendanceDaily, { foreignKey: "employeeId", targetKey: "employeeId" });
 
     Employee.belongsTo(Shift, { foreignKey: "shiftId" });
     Shift.hasMany(Employee, { foreignKey: "shiftId" });
@@ -471,6 +520,18 @@ export const initModels = async () => {
     EmployeeProject.belongsTo(Employee, { foreignKey: "employeeId", as: "employee" });
 
     /* ==============================
+       PROJECT FILE ASSOCIATIONS
+    ============================== */
+    Project.hasMany(ProjectFile, { foreignKey: "projectId", as: "files" });
+    ProjectFile.belongsTo(Project, { foreignKey: "projectId", as: "project" });
+
+    User.hasMany(ProjectFile, { foreignKey: "uploadedBy", as: "uploadedFiles" });
+    ProjectFile.belongsTo(User, { foreignKey: "uploadedBy", as: "uploader" });
+
+    Company.hasMany(ProjectFile, { foreignKey: "companyId", as: "projectFiles" });
+    ProjectFile.belongsTo(Company, { foreignKey: "companyId", as: "company" });
+
+    /* ==============================
        SETTINGS ASSOCIATIONS
     ============================== */
     Company.hasOne(CompanySettings, { foreignKey: "companyId", as: "settings" });
@@ -479,16 +540,105 @@ export const initModels = async () => {
     Company.hasMany(SystemSettings, { foreignKey: "companyId", as: "systemSettings" });
     SystemSettings.belongsTo(Company, { foreignKey: "companyId" });
 
+    /* ==============================
+       SUBSCRIPTION ASSOCIATIONS
+    ============================== */
+    Company.hasMany(SubscriptionRequest, { foreignKey: "companyId", as: "subscriptionRequests" });
+    SubscriptionRequest.belongsTo(Company, { foreignKey: "companyId", as: "company" });
+    SubscriptionRequest.belongsTo(User, { foreignKey: "processedBy", as: "processor" });
+
     Shift.hasMany(SystemSettings, { foreignKey: "defaultShiftId" });
     SystemSettings.belongsTo(Shift, { foreignKey: "defaultShiftId", as: "defaultShift" });
 
     /* ==============================
+       CHECKPOINT ASSOCIATIONS
+    ============================== */
+    Company.hasMany(Checkpoint, { foreignKey: "companyId", as: "checkpoints" });
+    Checkpoint.belongsTo(Company, { foreignKey: "companyId", as: "company" });
+
+    AttendanceLog.belongsTo(Checkpoint, { foreignKey: "checkpointId", as: "checkpoint" });
+    Checkpoint.hasMany(AttendanceLog, { foreignKey: "checkpointId", as: "logs" });
+
+    /* ==============================
+       TERMINAL ASSOCIATIONS
+    ============================== */
+    Company.hasMany(Terminal, { foreignKey: "companyId", as: "terminals" });
+    Terminal.belongsTo(Company, { foreignKey: "companyId", as: "company" });
+
+    /* ==============================
+       RESIGNATION & EXIT ASSOCIATIONS
+    ============================== */
+    Employee.hasMany(Resignation, { foreignKey: "employeeId", as: "resignations" });
+    Resignation.belongsTo(Employee, { foreignKey: "employeeId", as: "employee" });
+
+    Resignation.hasMany(ExitChecklist, { foreignKey: "resignationId", as: "checklistItems" });
+    ExitChecklist.belongsTo(Resignation, { foreignKey: "resignationId", as: "resignation" });
+
+    Company.hasMany(Resignation, { foreignKey: "companyId", as: "resignations" });
+    Resignation.belongsTo(Company, { foreignKey: "companyId", as: "company" });
+
+    /* ==============================
+       LOCATION LOG ASSOCIATIONS
+    ============================== */
+    Company.hasMany(LocationLog, { foreignKey: "companyId", as: "locationLogs" });
+    LocationLog.belongsTo(Company, { foreignKey: "companyId", as: "company" });
+
+    Employee.hasMany(LocationLog, { foreignKey: "employeeId", as: "locationLogs" });
+    LocationLog.belongsTo(Employee, { foreignKey: "employeeId", as: "employee" });
+
+
+    /* ==============================
+       SUPPORT MESSAGE ASSOCIATIONS
+    ============================== */
+    User.hasMany(SupportMessage, { foreignKey: "senderId", as: "sentSupportMessages" });
+    SupportMessage.belongsTo(User, { foreignKey: "senderId", as: "sender" });
+
+    User.hasMany(SupportMessage, { foreignKey: "receiverId", as: "receivedSupportMessages" });
+    SupportMessage.belongsTo(User, { foreignKey: "receiverId", as: "receiver" });
+
+    SupportMessage.belongsTo(Company, { foreignKey: "companyId", as: "company" });
+
+    /* ==============================
+       SUPPORT TICKET ASSOCIATIONS
+    ============================== */
+    User.hasMany(SupportTicket, { foreignKey: "userId", as: "tickets" });
+    SupportTicket.belongsTo(User, { foreignKey: "userId", as: "user" });
+
+    User.hasMany(SupportTicket, { foreignKey: "assignedTo", as: "assignedTickets" });
+    SupportTicket.belongsTo(User, { foreignKey: "assignedTo", as: "assignee" });
+
+    Company.hasMany(SupportTicket, { foreignKey: "companyId", as: "supportTickets" });
+    SupportTicket.belongsTo(Company, { foreignKey: "companyId", as: "companyInfo" });
+
+    SupportTicket.hasMany(ChatMessage, { foreignKey: "ticketId", as: "messages" });
+    ChatMessage.belongsTo(SupportTicket, { foreignKey: "ticketId", as: "ticket" });
+
+    User.hasMany(ChatMessage, { foreignKey: "senderId", as: "sentChatMessages" });
+    ChatMessage.belongsTo(User, { foreignKey: "senderId", as: "sender" });
+
+    User.hasMany(ChatMessage, { foreignKey: "receiverId", as: "receivedChatMessages" });
+    ChatMessage.belongsTo(User, { foreignKey: "receiverId", as: "receiver" });
+
+    DocumentVault.belongsTo(Employee, { foreignKey: "employeeId", as: "employee" });
+    DocumentVault.belongsTo(User, { foreignKey: "uploadedBy", as: "uploader" });
+    Employee.hasMany(DocumentVault, { foreignKey: "employeeId", as: "vaultDocuments" });
+
+    /* ==============================
        SYNC DATABASE
     ============================== */
-    await sequelize.sync({ alter: true });
+    await SupportMessage.sync({ alter: true });
+    await SupportTicket.sync({ alter: true });
+    await ChatMessage.sync({ alter: true });
+    await ProjectFile.sync({ alter: true });
+    await AttendanceDaily.sync({ alter: true });
+    // await sequelize.sync(); // Normal sync
 
-    console.log("✅ Models synchronized successfully");
+    await DocumentVault.sync({ alter: true });
+    console.log("✅ All models synchronized successfully");
   } catch (error) {
-    console.error("❌ Model synchronization failed:", error.message);
+    console.error("❌ Model synchronization failed:", error.message || error);
+    if (error.stack) {
+       console.error("Stack Trace:", error.stack.split('\n').slice(0, 5).join('\n'));
+    }
   }
 };

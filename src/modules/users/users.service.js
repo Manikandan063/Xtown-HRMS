@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { db } from "../../models/initModels.js";
-import AppError from "../../shared/appError.js";
+import AppError from "../../shared/utils/appError.js";
 
 const { User, Role } = db;
 
@@ -62,10 +62,16 @@ export const getUsersService = async (currentUser, companyFilter) => {
 
   return User.findAll({
     where: isSuperAdmin ? {} : companyFilter,
-    include: {
-      model: Role,
-      as: "role",
-    },
+    include: [
+      {
+        model: Role,
+        as: "role",
+      },
+      {
+        model: db.Company,
+        as: "company"
+      }
+    ],
   });
 };
 

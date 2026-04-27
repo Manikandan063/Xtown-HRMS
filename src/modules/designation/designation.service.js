@@ -4,9 +4,28 @@ export const createDesignation = async (data) => {
   return await db.Designation.create(data);
 };
 
-export const getAllDesignations = async (companyId) => {
-  return await db.Designation.findAll({
+export const getAllDesignations = async (companyId, query = {}) => {
+  const page = parseInt(query.page) || 1;
+  const limit = parseInt(query.limit) || 10;
+  const offset = (page - 1) * limit;
+
+  const { rows, count } = await db.Designation.findAndCountAll({
     where: { companyId },
+    limit,
+    offset,
+    attributes: {
+      include: [
+        [
+          db.sequelize.literal(`(
+            SELECT COUNT(*)
+            FROM "employees"
+            WHERE "employees"."designationId" = "Designation"."id"
+            AND "employees"."deletedAt" IS NULL
+          )`),
+          'employeeCount'
+        ]
+      ]
+    },
     include: [
       {
         model: db.Department,
@@ -15,6 +34,13 @@ export const getAllDesignations = async (companyId) => {
       },
     ],
   });
+
+  return {
+    total: count,
+    page,
+    limit,
+    data: rows
+  };
 };
 
 export const getDesignationById = async (id, companyId) => {

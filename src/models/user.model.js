@@ -48,6 +48,16 @@ export const User = sequelize.define(
       type: DataTypes.STRING(50),
       allowNull: true, // "HR", "MD" or null
     },
+    employeeId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: {
+        model: "employees",
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+      onDelete: "SET NULL",
+    },
   },
   {
     tableName: "users",

@@ -23,9 +23,25 @@ export const createCompanySchema = z.object({
     .optional()
     .or(z.literal("")),
 
+  domain: z
+    .string()
+    .optional()
+    .or(z.literal("")),
+
+  registrationNumber: z
+    .string()
+    .optional()
+    .or(z.literal("")),
+
   subscriptionPlan: z
     .enum(["BASIC", "PREMIUM", "ENTERPRISE"])
     .optional(),
+
+  currentPlanId: z
+    .string()
+    .uuid("Invalid Plan Reference")
+    .optional()
+    .or(z.literal("")),
 });
 
 /*
@@ -40,9 +56,19 @@ export const updateCompanySchema = z.object({
 
   address: z.string().optional(),
 
+  domain: z.string().optional(),
+
+  registrationNumber: z.string().optional(),
+
   subscriptionPlan: z
     .enum(["BASIC", "PREMIUM", "ENTERPRISE"])
     .optional(),
+
+  currentPlanId: z
+    .string()
+    .uuid("Invalid Plan Reference")
+    .optional()
+    .or(z.literal("")),
 
   isActive: z.boolean().optional(),
 });

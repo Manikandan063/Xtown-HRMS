@@ -1,9 +1,11 @@
-import asyncHandler from "../../shared/asyncHandler.js";
+import asyncHandler from "../../shared/utils/asyncHandler.js";
 import * as attendanceService from "./attendance.service.js";
 import { AttendanceLog } from "../../models/attendanceLog.model.js";
+import { db } from "../../models/initModels.js";
 import {
   manualPunchSchema,
   devicePushSchema,
+  manualAttendanceSchema,
 } from "./attendance.schema.js";
 import { Op } from "sequelize";
 
@@ -31,6 +33,49 @@ export const manualPunch = asyncHandler(async (req, res) => {
   );
 
   res.status(201).json({ success: true, data: log });
+});
+
+/* =========================================================
+   BULK MANUAL DAILY ATTENDANCE (ADMIN / HR)
+========================================================= */
+export const manualAttendance = asyncHandler(async (req, res) => {
+  const data = manualAttendanceSchema.parse(req.body);
+  const companyId = req.user.companyId;
+
+  // 1. Create IN log if time provided
+  if (data.checkInTime) {
+    // Expected format checkInTime: "09:00"
+    await attendanceService.createAttendanceLog({
+      companyId,
+      employeeId: data.employeeId,
+      punchTime: data.checkInTime,
+      punchType: "IN",
+      source: "MANUAL",
+      reason: data.reason
+    });
+  }
+
+  // 2. Create OUT log if time provided
+  if (data.checkOutTime) {
+    await attendanceService.createAttendanceLog({
+      companyId,
+      employeeId: data.employeeId,
+      punchTime: data.checkOutTime,
+      punchType: "OUT",
+      source: "MANUAL",
+      reason: data.reason
+    });
+  }
+
+  // 3. Recalculate Daily Attendance
+  await attendanceService.calculateDailyAttendance(
+    companyId,
+    data.employeeId,
+    data.date,
+    data.status
+  );
+
+  res.status(200).json({ success: true, message: "Manual attendance record processed" });
 });
 
 /* =========================================================
@@ -219,10 +264,7 @@ export const syncZK = asyncHandler(async (req, res) => {
       .json({ success: false, message: "IP address is required" });
   }
 
-  // Import service here or at the top
-  const zkSyncService = await import("./services/zkSync.service.js");
-  
-  const result = await zkSyncService.syncZKTecoAttendance(
+  const result = await attendanceService.syncZKTecoAttendance(
     ip,
     port || 4370,
     companyId
@@ -231,14 +273,171 @@ export const syncZK = asyncHandler(async (req, res) => {
   res.status(200).json(result);
 });
 
+
 /* =========================================================
    ATTENDANCE SUMMARY (MD / HR)
 ========================================================= */
 export const getAttendanceSummary = asyncHandler(async (req, res) => {
-  const summary = await attendanceService.getAttendanceSummary(req.user.companyId);
+  const summary = await attendanceService.getAttendanceSummary(req.user.companyId, req.user);
   res.status(200).json({
     success: true,
     data: summary,
     message: "Attendance summary fetched successfully"
   });
+});
+
+export const getMonthlyReport = asyncHandler(async (req, res) => {
+  const { month } = req.query; // Expects "2024-03"
+  const now = month ? new Date(month) : new Date();
+  
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+  const result = await attendanceService.getCompanyMonthlyAttendance(
+    req.user.companyId,
+    monthStart,
+    monthEnd,
+    req.user,
+    req.query
+  );
+
+  res.status(200).json({
+    success: true,
+    ...result,
+    message: "Monthly attendance report fetched successfully"
+  });
+});
+
+/* =========================================================
+   UPDATE ATTENDANCE (ADMIN / HR)
+========================================================= */
+export const updateAttendance = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const data = req.body;
+  const companyId = req.user.companyId;
+
+  // 1. If times are provided, synchronize manual logs first
+  if (data.checkInTime || data.checkOutTime) {
+    // Flush existing manual overrides for this specific date and employee
+    await AttendanceLog.destroy({
+      where: {
+        employeeId: data.employeeId,
+        companyId,
+        source: "MANUAL",
+        [Op.and]: [
+          db.sequelize.where(
+            db.sequelize.fn('DATE', db.sequelize.col('punchTime')),
+            '=',
+            data.date
+          )
+        ]
+      }
+    });
+
+    if (data.checkInTime) {
+      await attendanceService.createAttendanceLog({
+        companyId,
+        employeeId: data.employeeId,
+        punchTime: data.checkInTime,
+        punchType: "IN",
+        source: "MANUAL",
+        reason: data.reason || "Administrative Sync"
+      });
+    }
+    if (data.checkOutTime) {
+      await attendanceService.createAttendanceLog({
+        companyId,
+        employeeId: data.employeeId,
+        punchTime: data.checkOutTime,
+        punchType: "OUT",
+        source: "MANUAL",
+        reason: data.reason || "Administrative Sync"
+      });
+    }
+  }
+
+  // 2. Update the daily record and trigger recalculation
+  const updated = await attendanceService.updateAttendanceDaily(id, data, companyId);
+  if (!updated) return res.status(404).json({ message: "Attendance record not found" });
+
+  res.status(200).json({ 
+    success: true, 
+    data: updated, 
+    message: "Attendance synchronized successfully" 
+  });
+});
+
+/* =========================================================
+   DELETE ATTENDANCE (ADMIN / HR)
+========================================================= */
+export const deleteAttendance = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const companyId = req.user.companyId;
+
+  const deleted = await attendanceService.deleteAttendanceDaily(id, companyId);
+  if (!deleted) return res.status(404).json({ message: "Record not found" });
+
+  res.status(200).json({ success: true, message: "Attendance node purged" });
+});
+
+
+
+/* =========================================================
+   SELFIE ATTENDANCE (Employee Fallback)
+========================================================= */
+export const selfiePunch = asyncHandler(async (req, res) => {
+  const { latitude, longitude, imageUrl } = req.body;
+  const companyId = req.user.companyId;
+  const employeeId = req.user.employeeId;
+
+  if (!employeeId) {
+    return res.status(400).json({ success: false, message: "User is not linked to an employee record" });
+  }
+
+  if (!latitude || !longitude || !imageUrl) {
+    return res.status(400).json({ success: false, message: "GPS coordinates and selfie capture are required." });
+  }
+
+  const result = await attendanceService.selfiePunch({
+    companyId,
+    employeeId,
+    latitude,
+    longitude,
+    imageUrl,
+  });
+
+  res.status(201).json(result);
+});
+
+/* =========================================================
+   APPROVE / REJECT LOG (ADMIN / HR)
+========================================================= */
+export const approveLog = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body; // APPROVED or REJECTED
+  const companyId = req.user.companyId;
+
+  const result = await attendanceService.approveAttendanceLog(id, status, companyId);
+  res.status(200).json({ success: true, data: result, message: `Presence log ${status.toLowerCase()}.` });
+});
+/* =========================================================
+   PERIODIC LOCATION LOG (EMPLOYEE TRACKING)
+========================================================= */
+export const logLocation = asyncHandler(async (req, res) => {
+  const { latitude, longitude } = req.body;
+  const companyId = req.user.companyId;
+  const employeeId = req.user.employeeId;
+
+  if (!employeeId) {
+    return res.status(400).json({ success: false, message: "User is not linked to an employee" });
+  }
+
+  const log = await attendanceService.recordPeriodicLocation({
+    companyId,
+    employeeId,
+    latitude,
+    longitude
+  });
+
+  res.status(201).json({ success: true, data: log });
 });

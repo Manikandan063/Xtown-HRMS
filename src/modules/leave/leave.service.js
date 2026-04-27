@@ -1,6 +1,6 @@
 import { Op } from "sequelize";
-import { LeaveType, LeaveRequest, Employee, LeaveBalance, Holiday } from "../../models/initModels.js";
-import AppError from "../../shared/appError.js";
+import { LeaveType, LeaveRequest, Employee, LeaveBalance, Holiday, Notification, User, Role } from "../../models/initModels.js";
+import AppError from "../../shared/utils/appError.js";
 
 // =========================
 // CREATE LEAVE TYPE
@@ -10,7 +10,25 @@ export const createLeaveType = async (data, companyId) => {
 };
 
 export const getLeaveTypes = async (companyId) => {
-  return await LeaveType.findAll({ where: { companyId } });
+  const types = await LeaveType.findAll({ where: { companyId } });
+  const filtered = types.filter(t => t.leaveName !== 'Earned Leave');
+  
+  if (filtered.length === 0) {
+    // Auto-seed if no valid types exist (even if Earned Leave was there)
+    const defaults = [
+      { leaveName: 'Sick Leave', maxDaysPerYear: 10, companyId },
+      { leaveName: 'Casual Leave', maxDaysPerYear: 12, companyId }
+    ];
+    await LeaveType.bulkCreate(defaults);
+    const fresh = await LeaveType.findAll({ where: { companyId } });
+    return fresh.filter(t => t.leaveName !== 'Earned Leave');
+  }
+  
+  return filtered;
+};
+
+export const deleteLeaveType = async (id) => {
+  return await LeaveType.destroy({ where: { id } });
 };
 
 // =========================
@@ -49,13 +67,28 @@ export const createLeaveRequest = async (data, companyId) => {
     throw new AppError("Applied dates are all holidays", 400);
   }
 
-  // 3️⃣ Check Balance
-  const balance = await LeaveBalance.findOne({
+  // 3️⃣ Check/Initialize Balance
+  let balance = await LeaveBalance.findOne({
     where: { employeeId, leaveTypeId, year: start.getFullYear() }
   });
 
-  if (!balance || (parseFloat(balance.balance) - parseFloat(balance.used)) < totalDays) {
-     throw new AppError("Insufficient leave balance", 400);
+  if (!balance) {
+    const leaveType = await LeaveType.findByPk(leaveTypeId);
+    if (!leaveType) throw new AppError("Invalid leave type", 400);
+    
+    balance = await LeaveBalance.create({
+      employeeId,
+      leaveTypeId,
+      year: start.getFullYear(),
+      balance: leaveType.maxDaysPerYear,
+      used: 0 // Initialize at zero, increment only on Approval
+    });
+
+  }
+
+  const remaining = parseFloat(balance.balance) - parseFloat(balance.used);
+  if (remaining < totalDays) {
+     throw new AppError(`Insufficient leave balance. Available: ${remaining} days, Requested: ${totalDays} days.`, 400);
   }
 
   // 4️⃣ Prevent overlapping leave
@@ -74,11 +107,38 @@ export const createLeaveRequest = async (data, companyId) => {
     throw new AppError("Leave already applied for selected dates", 400);
   }
 
-  return await LeaveRequest.create({
+  const leave = await LeaveRequest.create({
     ...data,
     companyId,
     totalDays,
   });
+
+  // 5️⃣ Notify Admins/HR for "Quick Action"
+  try {
+    const employee = await Employee.findByPk(employeeId);
+    const admins = await User.findAll({
+      where: { companyId },
+      include: {
+        model: Role,
+        as: 'role',
+        where: { name: { [Op.in]: ['admin', 'hr', 'super_admin'] } }
+      }
+    });
+
+    const notifPromises = admins.map(admin => Notification.create({
+      companyId,
+      userId: admin.id,
+      title: 'New Leave Request',
+      message: `${employee.firstName} ${employee.lastName} has applied for ${totalDays} days of leave.`,
+      type: 'LEAVE_REQUEST',
+      referenceId: leave.id.toString()
+    }));
+    await Promise.all(notifPromises);
+  } catch (err) {
+    console.error('Notification seeding failed:', err.message);
+  }
+
+  return leave;
 };
 
 // =========================
@@ -95,7 +155,7 @@ export const updateLeaveStatus = async (id, status, approvedBy) => {
           where: { employeeId: leave.employeeId, leaveTypeId: leave.leaveTypeId, year: new Date(leave.fromDate).getFullYear() }
       });
       if (balance) {
-          balance.used = parseFloat(balance.used) + parseFloat(leave.totalDays);
+          balance.used = Number(balance.used) + leave.totalDays;
           await balance.save();
       }
   }
@@ -104,15 +164,156 @@ export const updateLeaveStatus = async (id, status, approvedBy) => {
   leave.approvedBy = approvedBy;
   leave.approvedAt = new Date();
 
-  return await leave.save();
+  const updated = await leave.save();
+
+  // 6️⃣ Notify Employee of status change
+  try {
+    const userToNotify = await User.findOne({ where: { employeeId: leave.employeeId } });
+    if (userToNotify) {
+      await Notification.create({
+        companyId: leave.companyId,
+        userId: userToNotify.id,
+        title: `Leave Request ${status}`,
+        message: `Your leave request for ${leave.totalDays} day(s) has been ${status.toLowerCase()}.`,
+        type: 'LEAVE_STATUS_UPDATE'
+      });
+    }
+  } catch (err) {
+    console.error('Employee notification failed:', err.message);
+  }
+
+  return updated;
 };
 
-export const getLeaveRequests = async (companyId) => {
-  return await LeaveRequest.findAll({
-    where: { companyId },
-    include: [Employee, LeaveType],
-  });
+export const markAsViewed = async (companyId) => {
+  if (!companyId) return;
+  return await LeaveRequest.update(
+    { viewedAt: new Date() },
+    { 
+      where: { 
+        companyId, 
+        status: 'Pending', 
+        viewedAt: null 
+      } 
+    }
+  );
 };
+
+export const markSingleAsViewed = async (id, userId) => {
+  const leave = await LeaveRequest.findByPk(id);
+  if (leave && !leave.viewedAt) {
+    leave.viewedAt = new Date();
+    await leave.save();
+  }
+  return leave;
+};
+
+export const getLeaveRequests = async (companyId, query = {}) => {
+  const page = parseInt(query.page) || 1;
+  const limit = parseInt(query.limit) || 10;
+  const offset = (page - 1) * limit;
+  const search = query.search || "";
+  const status = query.status || "ALL";
+
+  const where = { companyId };
+
+  if (status !== "ALL") {
+    where.status = status;
+  }
+
+  const employeeInclude = {
+    model: Employee,
+    attributes: ["firstName", "lastName", "employeeCode"],
+    required: !!search // Force INNER JOIN only if searching
+  };
+
+  if (search) {
+    employeeInclude.where = {
+      [Op.or]: [
+        { firstName: { [Op.iLike]: `%${search}%` } },
+        { lastName: { [Op.iLike]: `%${search}%` } },
+        { employeeCode: { [Op.iLike]: `%${search}%` } }
+      ]
+    };
+  }
+
+  // 🔹 Auto-mark as viewed
+  try {
+    await markAsViewed(companyId);
+  } catch (err) {
+    console.warn('[LeaveTracker]: Batch view update failed');
+  }
+
+  const { rows, count } = await LeaveRequest.findAndCountAll({
+    where,
+    limit,
+    offset,
+    include: [employeeInclude, LeaveType],
+    order: [['createdAt', 'DESC']]
+  });
+
+  // Fetch status counts for the company
+  const [pendingCount, approvedCount, rejectedCount] = await Promise.all([
+    LeaveRequest.count({ where: { companyId, status: 'Pending' } }),
+    LeaveRequest.count({ where: { companyId, status: 'Approved' } }),
+    LeaveRequest.count({ where: { companyId, status: 'Rejected' } })
+  ]);
+
+  return {
+    total: count,
+    page,
+    limit,
+    data: rows,
+    counts: {
+      pending: pendingCount,
+      approved: approvedCount,
+      rejected: rejectedCount
+    }
+  };
+};
+
+export const getEmployeeLeaveRequests = async (employeeId, companyId, query = {}) => {
+  const page = parseInt(query.page) || 1;
+  const limit = parseInt(query.limit) || 10;
+  const offset = (page - 1) * limit;
+  const status = query.status || "ALL";
+
+  const where = { employeeId, companyId };
+  if (status !== "ALL") {
+    where.status = status;
+  }
+
+  const { rows, count } = await LeaveRequest.findAndCountAll({
+    where,
+    limit,
+    offset,
+    include: [Employee, LeaveType],
+    order: [['createdAt', 'DESC']]
+  });
+
+  const [pendingCount, approvedCount, rejectedCount] = await Promise.all([
+    LeaveRequest.count({ where: { employeeId, companyId, status: 'Pending' } }),
+    LeaveRequest.count({ where: { employeeId, companyId, status: 'Approved' } }),
+    LeaveRequest.count({ where: { employeeId, companyId, status: 'Rejected' } })
+  ]);
+
+  return {
+    total: count,
+    page,
+    limit,
+    data: rows,
+    counts: {
+      pending: pendingCount,
+      approved: approvedCount,
+      rejected: rejectedCount
+    },
+    balances: await LeaveBalance.findAll({
+      where: { employeeId, year: new Date().getFullYear() },
+      include: [{ model: LeaveType, as: 'leaveType', attributes: ['leaveName'] }]
+    })
+  };
+};
+
 
 // =========================
 // MONTHLY CREDIT SYSTEM

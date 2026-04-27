@@ -1,4 +1,4 @@
-import AppError from "../appError.js";
+import AppError from "../utils/appError.js";
 
 /**
  * Middleware to restrict access based on user designation (HR or MD).
@@ -10,7 +10,8 @@ export const designationAccess = (req, res, next) => {
   const { role, designation } = req.user;
 
   // 1. Super Admin always has full access
-  if (role === "SUPER_ADMIN" || role === "Super Admin") {
+  const normalizedRole = String(role || "").toUpperCase().replace(/[^A-Z]/g, "");
+  if (normalizedRole === "SUPERADMIN") {
     return next();
   }
 
@@ -31,16 +32,29 @@ export const designationAccess = (req, res, next) => {
 };
 
 export const isHR = (req, res, next) => {
-  const { designation, role } = req.user;
-  if (designation !== "HR" && role !== "SUPER_ADMIN" && role !== "Super Admin") {
+  const { role, designation } = req.user;
+  const normalizedRole = String(role || "").toUpperCase().replace(/[^A-Z]/g, "");
+  
+  // Allow SuperAdmins and Admins (Owners)
+  if (normalizedRole === "SUPERADMIN" || normalizedRole === "ADMIN") {
+    return next();
+  }
+
+  if (designation !== "HR") {
     return next(new AppError("Forbidden - Only HR has full access", 403));
   }
   next();
 };
 
 export const isMD = (req, res, next) => {
-  const { designation, role } = req.user;
-  if (designation !== "MD" && role !== "SUPER_ADMIN" && role !== "Super Admin") {
+  const { role, designation } = req.user;
+  const normalizedRole = String(role || "").toUpperCase().replace(/[^A-Z]/g, "");
+
+  if (normalizedRole === "SUPERADMIN" || normalizedRole === "ADMIN") {
+    return next();
+  }
+
+  if (designation !== "MD") {
     return next(new AppError("Forbidden - Access denied", 403));
   }
   
@@ -52,12 +66,13 @@ export const isMD = (req, res, next) => {
 
 export const isHRorMD = (req, res, next) => {
   const { designation, role } = req.user;
-  if (
-    designation !== "HR" &&
-    designation !== "MD" &&
-    role !== "SUPER_ADMIN" &&
-    role !== "Super Admin"
-  ) {
+  const normalizedRole = String(role || "").toUpperCase().replace(/[^A-Z]/g, "");
+
+  if (normalizedRole === "SUPERADMIN" || normalizedRole === "ADMIN") {
+    return next();
+  }
+
+  if (designation !== "HR" && designation !== "MD") {
     return next(new AppError("Forbidden - Access restricted to HR and MD", 403));
   }
   

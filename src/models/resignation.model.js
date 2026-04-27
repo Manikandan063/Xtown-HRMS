@@ -21,9 +21,17 @@ export default (sequelize) => {
       reason: {
         type: DataTypes.TEXT,
       },
+      comments: {
+        type: DataTypes.TEXT,
+      },
       noticePeriod: {
         type: DataTypes.INTEGER,
         field: "notice_period",
+      },
+      resignationDate: {
+        type: DataTypes.DATEONLY,
+        field: "resignation_date",
+        defaultValue: DataTypes.NOW,
       },
       lastWorkingDate: {
         type: DataTypes.DATEONLY,
@@ -31,7 +39,7 @@ export default (sequelize) => {
       },
       status: {
         type: DataTypes.STRING,
-        defaultValue: "pending",
+        defaultValue: "pending", 
       },
       finalSettlementAmount: {
         type: DataTypes.DECIMAL(15, 2),
@@ -42,6 +50,11 @@ export default (sequelize) => {
         type: DataTypes.STRING,
         defaultValue: "pending",
         field: "settlement_status",
+      },
+      settlementBreakdown: {
+        type: DataTypes.JSONB,
+        defaultValue: {},
+        field: "settlement_breakdown",
       },
     },
     {

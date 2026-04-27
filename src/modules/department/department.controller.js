@@ -3,7 +3,7 @@ import {
   createDepartmentSchema,
   updateDepartmentSchema,
 } from "./department.schema.js";
-import asyncHandler from "../../shared/asyncHandler.js";
+import asyncHandler from "../../shared/utils/asyncHandler.js";
 
 export const createDepartment = asyncHandler(async (req, res) => {
   const data = createDepartmentSchema.parse(req.body);
@@ -21,13 +21,14 @@ export const createDepartment = asyncHandler(async (req, res) => {
 });
 
 export const getDepartments = asyncHandler(async (req, res) => {
-  const departments = await departmentService.getAllDepartments(
-    req.user.companyId
+  const result = await departmentService.getAllDepartments(
+    req.user.companyId,
+    req.query
   );
 
   res.json({
     success: true,
-    data: departments,
+    ...result,
   });
 });
 

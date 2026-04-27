@@ -1,4 +1,4 @@
-import AppError from "../appError.js";
+import AppError from "../utils/appError.js";
 
 export function allowRoles(...allowedRoles) {
   return (req, res, next) => {

@@ -1,4 +1,4 @@
-import asyncHandler from "../../shared/asyncHandler.js";
+import asyncHandler from "../../shared/utils/asyncHandler.js";
 import * as settingsSchema from "./settings.schema.js";
 import * as settingsService from "./settings.service.js";
 

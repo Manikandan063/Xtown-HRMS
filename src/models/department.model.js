@@ -25,6 +25,11 @@ export default (sequelize) => {
         type: DataTypes.STRING(100),
         allowNull: false,
       },
+      
+      code: {
+        type: DataTypes.STRING(20),
+        allowNull: true,
+      },
 
       description: {
         type: DataTypes.STRING(255),
@@ -33,6 +38,14 @@ export default (sequelize) => {
       isActive: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
+      },
+      headId: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        references: {
+          model: "employees",
+          key: "id",
+        },
       },
     },
     {

@@ -31,5 +31,8 @@ export const notificationModel = (sequelize) => {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
+    referenceId: {
+      type: DataTypes.STRING,
+    },
   });
 };

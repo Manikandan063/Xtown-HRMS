@@ -1,4 +1,5 @@
-import asyncHandler from "../../shared/asyncHandler.js";
+import asyncHandler from "../../shared/utils/asyncHandler.js";
+import { Role } from "../../models/initModels.js";
 import {
   createUserService,
   getUsersService,
@@ -23,4 +24,9 @@ export const updateUser = asyncHandler(async (req, res) => {
 export const deleteUser = asyncHandler(async (req, res) => {
   await deleteUserService(req.params.id, req.user);
   res.json({ success: true, message: "User deleted successfully" });
+});
+
+export const getRoles = asyncHandler(async (req, res) => {
+  const roles = await Role.findAll();
+  res.json({ success: true, data: roles });
 });

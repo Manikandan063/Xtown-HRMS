@@ -252,7 +252,11 @@ export const updateProfileImage = asyncHandler(async (req, res) => {
   }
 
   const imagePath = `/uploads/profiles/${req.file.filename}`;
+  const user = req.user;
+  const isAdmin = (user.role === 'admin' || user.role === 'super_admin' || user.role === 'superadmin');
+
   employee.profileImage = imagePath;
+  employee.updatedBy = isAdmin ? user.userId : null;
   await employee.save();
 
   res.json({
@@ -280,7 +284,11 @@ export const deleteProfileImage = asyncHandler(async (req, res) => {
     }
   }
 
+  const user = req.user;
+  const isAdmin = (user.role === 'admin' || user.role === 'super_admin' || user.role === 'superadmin');
+
   employee.profileImage = null;
+  employee.updatedBy = isAdmin ? user.userId : null;
   await employee.save();
 
   res.json({

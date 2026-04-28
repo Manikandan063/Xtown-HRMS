@@ -62,6 +62,7 @@ const AttendanceList = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [status, setStatus] = useState('ALL');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -79,7 +80,7 @@ const AttendanceList = () => {
     try {
       setLoading(true);
       const [reportData, companyData] = await Promise.all([
-        apiFetch(`/attendance/report?page=${page}&limit=${limit}&search=${searchQuery}&status=${status}&startDate=${startDate}&endDate=${endDate}`),
+        apiFetch(`/attendance/report?page=${page}&limit=${limit}&search=${debouncedSearch}&status=${status}&startDate=${startDate}&endDate=${endDate}`),
         apiFetch('/companies')
       ]);
       setLogs(reportData?.data || []);
@@ -92,7 +93,7 @@ const AttendanceList = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, searchQuery, status, startDate, endDate]);
+  }, [page, limit, debouncedSearch, status, startDate, endDate]);
 
   useEffect(() => {
     fetchAttendance();
@@ -101,7 +102,16 @@ const AttendanceList = () => {
   // Reset to first page when searching
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, status, startDate, endDate]);
+  }, [debouncedSearch, status, startDate, endDate]);
+
+  // Debounce Logic: Update search after 500ms of no typing
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 500);
+
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
   const formatTime = (timeStr) => {
     if (!timeStr) return '--:--';
@@ -223,7 +233,7 @@ const AttendanceList = () => {
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
-              placeholder="Search employee..." 
+              placeholder={canEdit ? "Search name, code or status..." : "Search status (e.g. Present)..."} 
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="pl-11 h-12 border-none bg-muted rounded-2xl font-bold italic"

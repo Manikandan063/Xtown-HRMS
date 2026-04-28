@@ -152,8 +152,8 @@ const SuperAdminSidebar = () => {
   return (
     <aside className="w-64 bg-slate-900 text-white flex flex-col h-screen sticky top-0 border-r border-slate-800 shadow-2xl transition-all duration-300">
       <div className="p-6 border-b border-slate-800 bg-slate-950/20">
-        <h1 className="text-xl font-black tracking-tighter text-blue-400">XTown <span className="text-white italic">SUPER</span></h1>
-        <p className="text-[10px] text-blue-600 font-black uppercase tracking-widest mt-1 opacity-80">Admin Panel</p>
+        <h1 className="text-xl font-black tracking-tighter text-blue-400 uppercase">XTOWN <span className="text-white italic">HRMS</span></h1>
+        <p className="text-[10px] text-blue-600 font-black uppercase tracking-widest mt-1 opacity-80">Super Admin Panel</p>
       </div>
 
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">

@@ -33,9 +33,10 @@ const Navbar = () => {
       {/* Search or Page Title could go here */}
       <div className="flex items-center gap-2">
          <div className="h-6 w-1 bg-primary rounded-full shadow-sm shadow-primary/40" />
-         <h2 className="text-xl font-extrabold tracking-tight uppercase text-foreground">
-            {user?.companyName || 'XTOWN'}
-         </h2>
+          <h2 className="text-xl font-black tracking-tighter uppercase text-foreground flex items-center gap-1">
+            <span className="text-primary">{user?.companyName?.split(' ')[0] || 'XTOWN'}</span>
+            <span className="italic opacity-90">{user?.companyName?.split(' ').slice(1).join(' ') || 'HRMS'}</span>
+          </h2>
       </div>
 
 

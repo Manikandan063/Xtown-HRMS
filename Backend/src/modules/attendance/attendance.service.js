@@ -574,12 +574,20 @@ export const getCompanyMonthlyAttendance = async (
     filter.employeeId = user.employeeId;
   }
 
-  const employeeIncludeFilter = {};
   if (search) {
-    employeeIncludeFilter[Op.or] = [
-      { firstName: { [Op.iLike]: `%${search}%` } },
-      { lastName: { [Op.iLike]: `%${search}%` } },
-      { employeeCode: { [Op.iLike]: `%${search}%` } }
+    const searchVal = `%${search}%`;
+    filter[Op.or] = [
+      db.sequelize.where(
+        db.sequelize.cast(db.sequelize.col('AttendanceDaily.status'), 'TEXT'),
+        { [Op.iLike]: searchVal }
+      ),
+      { '$Employee.firstName$': { [Op.iLike]: searchVal } },
+      { '$Employee.lastName$': { [Op.iLike]: searchVal } },
+      { '$Employee.employeeCode$': { [Op.iLike]: searchVal } },
+      db.sequelize.where(
+        db.sequelize.fn('concat', db.sequelize.col('Employee.firstName'), ' ', db.sequelize.col('Employee.lastName')),
+        { [Op.iLike]: searchVal }
+      )
     ];
   }
 
@@ -588,11 +596,11 @@ export const getCompanyMonthlyAttendance = async (
     limit,
     offset,
     distinct: true,
+    subQuery: false,
     include: [
       {
         model: Employee,
         attributes: ["firstName", "lastName", "employeeCode"],
-        where: search ? employeeIncludeFilter : undefined
       },
       {
         model: AttendanceLog,

@@ -263,7 +263,7 @@ export const updateEmployee = async (id, data, user) => {
     // 2. Update main employee record
     await employee.update({
       ...mainData,
-      updatedBy: user.userId,
+      updatedBy: (user.role === 'admin' || user.role === 'super_admin' || user.role === 'superadmin') ? user.userId : null,
     }, { transaction });
 
     // 3. Helper to update or create nested records
@@ -559,7 +559,7 @@ export const toggleResignationAccess = async (id, user) => {
 
   await employee.update({
     canResign: !employee.canResign,
-    updatedBy: user.userId,
+    updatedBy: (user.role === 'admin' || user.role === 'super_admin' || user.role === 'superadmin') ? user.userId : null,
   });
 
   return employee;

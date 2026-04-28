@@ -159,12 +159,9 @@ const Sidebar = () => {
 
   return (
     <aside className="w-64 border-r border-border bg-card flex flex-col h-screen sticky top-0 overflow-hidden shadow-sm transition-all duration-300">
-      <div className="h-16 flex items-center gap-3 px-6 shrink-0 border-b border-border">
-        <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center text-white font-black italic shadow-md shadow-primary/20">X</div>
-        <div className="flex flex-col">
-           <span className="text-sm font-black tracking-tighter text-foreground">XTown HRMS</span>
-           <span className="text-[9px] font-bold text-primary uppercase tracking-widest">Enterprise Suite</span>
-        </div>
+      <div className="p-6 border-b border-border">
+        <h1 className="text-xl font-black tracking-tighter text-primary uppercase">XTOWN <span className="text-foreground italic">HRMS</span></h1>
+        <p className="text-[10px] text-primary font-black uppercase tracking-widest mt-1 opacity-70">Enterprise Suite</p>
       </div>
 
       <nav className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">

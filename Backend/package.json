@@ -1,7 +1,7 @@
 {
-  "name": "rv-express-app",
+  "name": "xtown-hrms-backend",
   "version": "1.0.0",
-  "description": "CLI tool to scaffold a modular Express.js app with role-based auth and Sequelize/Postgres setup.",
+  "description": "Backend API for XTOWN Human Resource Management System with Real-Time Support and Biometric Integration.",
   "main": "server.js",
   "type": "module",
   "private": true,

@@ -50,7 +50,7 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: "*",
+    origin: process.env.CLIENT_URL || "*",
     methods: ["GET", "POST"]
   }
 });
@@ -128,7 +128,7 @@ io.on("connection", (socket) => {
 });
 
 // Global Middlewares
-app.use(cors()); 
+app.use(cors({ origin: process.env.CLIENT_URL || "*" })); 
 app.use(helmet({ 
   crossOriginResourcePolicy: false,
   crossOriginEmbedderPolicy: false 

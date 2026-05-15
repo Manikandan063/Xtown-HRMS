@@ -1,5 +1,5 @@
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -125,4 +125,14 @@ web_modules/
 # .DS_Store
 
 # # Windows
-# Thumbs.db
+Thumbs.db
+
+# Project Specific
+uploads/
+assets/
+scratch/
+.vscode/
+.idea/
+*.local
+dist/
+build/
